@@ -1,0 +1,724 @@
+---
+title: "Instroduction to R and Rstudio"
+subtitle: "Session 5: Visualisation"
+output: html_document
+---
+
+
+# Session 5 Introduction
+
+The plots we produce will aim to present a large volume of information in graphical format. The ideal application would be for a presentation
+There are four plots we will produce which can be broken down into different variations:
+- A scatterplot: (i) basic (ii) with regression line, (iii) with groups (iv) groups and splines
+- A Diverging barchart (i) Binary data split, (ii) Likert data
+- A Modified boxplot for a t-test (i) Boxplot, (ii) T-distribution
+- A Cell means Plot for ANOVA (can be used for RM/ Independent measures), this can also be used for time series data
+- A heatmap and stacked bar chart for Factor Analysis and Factor loadings, conceptually, aheatmap may be applied to any clustering procedure
+
+##0 Options and packages
+We will primarily use `ggplot2` from the `tidyverse`. The useful thing is we can just load in tidyverse and it will provide all the packages we need, although we will need a few more, cowplot and ggnet
+```{r}
+library(tidyverse)
+```
+
+### GGplot2 methods
+
+First lets make some practice data
+```{r}
+practice  <- read.csv("exs5.csv")
+
+practice # view the data frame
+```
+
+Now we need to change the Time variable to a factor
+```{r}
+practice$Time  <- factor(practice$Time)
+
+practice #view the data frame
+```
+
+GGplot2 works by stating what features in a data frame you wish to visualise, then adding the appropriate graph layers using the `+` operator. 
+
+#### `aes()`
+Graphs can be saved as objects at any stage of a build
+GGplot2 takes in a set of aesthetics using the `aes()` function. `aes()` can be called inside the `ggplot()` function.
+If we wanted to graph the distribution of the calories variable:
+```{r}
+ggplot(data = practice,
+       aes(x=Calories)) +
+  geom_histogram(bins = 15)
+```
+If we wanted to visualise the proportion of counts in each level of the curriculum category:
+```{r}
+ggplot(data = practice, aes(x = Curriculum))+
+  geom_bar()
+```
+
+If we wanted to do a box plot of differences by Curriculum:
+```{r}
+ggplot(data = practice, aes(x=Curriculum, y = Calories))+
+  geom_boxplot()
+```
+
+#### Rm ANOVA
+So lets say we want to plot  for a Repeated Measures ANOVA. If we perform a summary using tidyverse functions we can get useable summary data which we cna then plot
+```{r}
+practice %>%
+  group_by(Curriculum, Time) %>%
+  summarise(Mean = mean(Calories), 
+            StDev = sd(Calories), 
+            n = n(), 
+            StdError = StDev/sqrt(n)) ->> SummaryPractice
+SummaryPractice
+```
+
+We can now use the `SummaryPractice` data frame for a cell-means interaction plot
+```{r}
+ggplot(data = SummaryPractice, aes(y= Mean, x = Time, group = Curriculum, colour=Curriculum))+
+  geom_errorbar(aes(ymin=Mean - StdError, 
+                    ymax=Mean + StdError), 
+                width=.8, 
+    position=position_dodge(0.05))+
+  geom_line(size = 1) +
+   geom_point(size = 5,
+              fill='white',
+             shape = 21)
+```
+We can also change the theme of the plot:
+```{r}
+ggplot(data = SummaryPractice, aes(y= Mean, x = Time, group = Curriculum, colour=Curriculum))+
+  geom_errorbar(aes(ymin=Mean - StdError, 
+                    ymax=Mean + StdError), 
+                width=.8, 
+    position=position_dodge(0.05))+
+  geom_line(size = 1) +
+   geom_point(size = 5,
+              fill='white',
+             shape = 21)+
+  theme_classic()
+```
+
+We can also save the plot as an object
+```{r}
+ggplot(data = SummaryPractice, aes(y= Mean, x = Time, group = Curriculum, colour=Curriculum))+
+  geom_errorbar(aes(ymin=Mean - StdError, 
+                    ymax=Mean + StdError), 
+                width=.8, 
+    position=position_dodge(0.05))+
+  geom_line(size = 1) +
+   geom_point(size = 5,
+              fill='white',
+             shape = 21)+
+  theme_classic() ->> Cell_MeansPlot1
+```
+
+```{r}
+# Save as a .pdf file
+#pdf("Cell_Means1.pdf")
+Cell_MeansPlot1
+#dev.off()
+```
+We can also view changes in time according to person by going back to the original data frame and using the `facet_grid()` layer:
+```{r}
+ggplot(data = practice, aes(y= Calories, x = Time , group = Person, colour=Person))+
+  geom_line(size = 1) +
+   geom_point(size = 5,
+              fill='white',
+             shape = 21)+
+  facet_grid(~Person)+
+  theme_classic()
+```
+
+```{r}
+ aov(Calories ~ (Curriculum*Time) + Error(Person/(Time)), data = practice)
+```
+
+#ADVANCED GRAPHING
+
+##1 Visualising a t-test
+Taking the t-test data from session 2 example markdown file
+```{r}
+# Create long format data frame
+df.long   <- data.frame(Response  = c(01,
+                                      02, 02, 
+                                      03, 03, 03, 
+                                      04, 04, 04, 04,
+                                      05, 05, 05, 05, 05, 
+                                      06, 06, 06, 06, 06, 06,
+                                      07, 07, 07, 07, 07, 07, 07, 
+                                      08, 08, 08, 08, 08, 08,
+                                      09, 09, 09, 09, 09,
+                                      10, 10, 10, 10, 
+                                      11, 11, 11, 
+                                      12, 12,
+                                      13,
+                                      04, 
+                                      05, 05,
+                                      06, 06, 06, 
+                                      07, 07, 07, 07, 
+                                      08, 08, 08, 08, 08,
+                                      09, 09, 09, 09, 09, 09, 
+                                      10, 10, 10, 10, 10, 10, 10,
+                                      11, 11, 11, 11, 11, 11, 
+                                      12, 12, 12, 12, 12,
+                                      13, 13, 13, 13, 
+                                      14, 14, 14, 
+                                      15, 15, 
+                                      16),
+                        Condition = c("M",
+                                      "M", "M",
+                                      "M", "M", "M",
+                                      "M", "M", "M", "M",
+                                      "M", "M", "M", "M", "M",
+                                      "M", "M", "M", "M", "M", "M",
+                                      "M", "M", "M", "M", "M", "M", "M",
+                                      "M", "M", "M", "M", "M", "M",
+                                      "M", "M", "M", "M", "M",
+                                      "M", "M", "M", "M",
+                                      "M", "M", "M",
+                                      "M", "M",
+                                      "M",
+                                      "F",
+                                      "F", "F",
+                                      "F", "F", "F",
+                                      "F", "F", "F", "F",
+                                      "F", "F", "F", "F", "F",
+                                      "F", "F", "F", "F", "F", "F",
+                                      "F", "F", "F", "F", "F", "F", "F",
+                                      "F", "F", "F", "F", "F", "F",
+                                      "F", "F", "F", "F", "F",
+                                      "F", "F", "F", "F",
+                                      "F", "F", "F",
+                                      "F", "F",
+                                      "F"))
+df.long
+```
+So now we build ur ttest:
+```{r}
+t.test(Response ~ Condition, data = df.long, var.equal=TRUE)
+```
+
+Now that we have the data we can begin to build the plot:
+```{r}
+qt(.95, 96)
+pt(1.661, 96)
+```
+
+First plot the t distribution with a df of 96
+Rejection Regions for the t-distribution with a df of 96:
+```{r}
+Rejection_Regions  <- data.frame(Alpha=c("5%", "5%", "1%", 
+                                         "1%", "0.1%", "0.1%"),
+                                 Rejection=c(qt(.95, df=96),
+                                               qt(0.05, df = 96),
+                                               qt(0.99, df = 96),
+                                               qt(0.01, df = 96),
+                                               qt(0.999, df = 96),
+                                               qt(0.001, df = 96)))
+Rejection_Regions  #1.660
+```
+Use the `dt()` function for density of t distribution, function.
+```{r}
+stats::dt(x = c(-5, 5), df= 96)
+```
+
+Plot the t-distribution with 96 df
+
+```{r}
+df   <- 96
+p    <- 0.001
+gg   <- data.frame(x=seq(-4,4,0.1))
+gg$y <- dt(gg$x,df)
+```
+
+```{r}
+tdist  <-  data.frame(x = c(-4, 4))
+```
+
+Visualise the t-test rejection region:
+```{r}
+ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
+        stat_function(fun = dt, args = list(df = 96))+
+  geom_hline(yintercept = 0.0)+
+  geom_area(stat = "function",args=list(df =96), fun = dt, fill = "tomato3", xlim = c(1.66, 4))+
+  geom_area(stat = "function",args=list(df =96), 
+            fun = dt, fill = "tomato3", xlim = c(-1.66, -4))+
+  ggtitle(expression(paste("T-distribution ", alpha, " = 0.05,", italic(" df "), " = 96")))+
+  scale_x_continuous(breaks = c(-4, -3,-1.66, -1, 0, 1, 1.66, 3, 4))+
+  annotate('text', x = 3, y = .2, label= "5% Upper Rejection Region" )+
+  annotate('text', x = -3, y = .2, label= "95% Lower Rejection Region" )+
+  xlab("t")+
+  theme_classic()->> reject2
+reject2
+```
+
+```{r}
+#pdf("rejection2.pdf")
+reject2
+#dev.off()
+```
+
+Add the coord_flip() layer to rotate the plot
+```{r}
+ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
+        stat_function(fun = dt, args = list(df = 96))+
+  geom_hline(yintercept = 0.0)+
+  geom_vline(xintercept = 0, linetype='dashed', colour='tomato3', size=2)+
+  geom_vline(xintercept = -3.177308, colour='dodgerblue4', linetype='dashed', size=2)+
+  geom_vline(xintercept = -1.660881, colour='tomato3')+
+  geom_area(stat = "function",args=list(df =96), fun = dt, fill = "tomato3", xlim = c(1.66, 4))+
+  geom_area(stat = "function",args=list(df =96), fun = dt, fill = "tomato3", xlim = c(-1.66, -4))+
+  scale_x_continuous(limits = c(-10.45, 7))+
+  theme_void() +
+  theme(panel.background = element_rect(fill = "transparent", colour = NA), 
+        plot.background = element_rect(fill = "transparent", colour = NA))+
+  coord_flip() ->> t.distplt
+
+t.distplt
+```
+
+
+```{r}
+ggplot(df.long, aes(Condition, Response, colour=Condition, fill=Condition))+
+  geom_violin(fill='white',
+              colour='grey22',
+              size = 2)+
+  geom_dotplot(stackdir = 'center', 
+               binaxis = "y", 
+               colour="grey22",
+               dotsize = 1, 
+               binwidth = .5)+
+  geom_hline(yintercept=mean(df.long$Response[df.long$Condition=="F"]),
+             colour='tomato3',
+             linetype='dashed',
+             size = 2)+
+  geom_hline(yintercept=mean(df.long$Response[df.long$Condition=="M"]),
+             colour = 'dodgerblue4',
+             linetype='dashed', 
+             size=2)+
+  geom_point(data = df.summary, aes(x=Condition, y=mean), 
+             shape=23, 
+             size=8,
+             fill="grey22",
+             alpha=.8,
+             stroke=1.5,
+             show.legend = FALSE)+
+  scale_fill_manual(values=c("tomato", "dodgerblue2"))+
+  theme(legend.position=c(0.1, 0.1),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) ->> plt.data2
+
+plt.data2
+
+```
+
+```{r}
+# Plot panel
+library(cowplot)
+```
+
+```{r}
+# correct plot
+#pdf("dotpltT3.pdf")
+plot_grid(plt.data2, t.distplt, rel_widths = c(4,1))# Almost there
+#dev.off()
+```
+
+Now we can plot the distribution density of the `Female` condition, with a lower rejection region (0.05 % of the distribution)
+```{r}
+# Create Normalised values for normal curve
+xfit <- seq(min(df.long$Response[df.long$Condition=="F"]),
+            max(df.long$Response[df.long$Condition=="F"]),
+            length=40)
+
+yfit <- dnorm(xfit,
+              mean = mean(df.long$Response[df.long$Condition=="F"]),
+              sd = sd(df.long$Response[df.long$Condition=="F"]))
+```
+
+
+```{r}
+ggplot()+
+  geom_line(aes(x=xfit, y = yfit),                   # Input x and y data
+            colour="tomato",                         # line colour
+            size = 1.5)+
+  geom_vline(xintercept = mean(df.long$Response[df.long$Condition=="F"]),    # x axis intercept
+             size = 1.5,
+             colour= "tomato",                       # Colour
+             linetype = "dashed")+
+  scale_x_continuous(limits = c(0,16))+
+coord_flip()+                                      # Rotate the plot
+  theme_void() ->> dist.data
+
+dist.data
+```
+
+Now using `cowplot` we can combine the two plots with a horizontal alignment, note that this works becasue we have set the x axis limits for the distribution plot to match the limits on the dotplot
+
+
+Alternatively:
+Extract a summary table and save as an object:
+```{r}
+df.long %>%
+  group_by(Condition) %>%
+  summarise(mean=mean(Response), st.dev=sd(Response), n=n()) %>%
+  as_data_frame() ->> df.summary
+df.summary  
+```
+
+
+####Reversing the plot for t-tests
+The t-distribution portion of the plot can be visualised in reverse
+##2 Visualising ANOVA
+Here we will use the General Linear Model ANOVA, where the `aov()` function is replaced with `lm()`
+ANOVA data from session 3 practical, where we will also include a second factor Variable.
+
+```{r}
+ggplot(df.long, aes(Condition, Response, colour=Condition, fill=Condition))+
+  geom_boxplot(fill='white',
+               colour='grey22',
+               size = 2,
+               notch = TRUE)+
+  geom_dotplot(stackdir = 'center', 
+               binaxis = "y", 
+               colour="grey22",
+               dotsize = 1, 
+               binwidth = .5)+
+  geom_hline(yintercept=mean(df.long$Response[df.long$Condition=="F"]),
+             colour='tomato3',
+             linetype='dashed',
+             size = 2)+
+  geom_hline(yintercept=mean(df.long$Response[df.long$Condition=="M"]),
+             colour = 'dodgerblue4',
+             linetype='dashed', 
+             size=2)+
+  geom_point(data = df.summary, aes(x=Condition, y=mean), 
+             shape=23, 
+             size=8,
+             fill="grey22",
+             alpha=.8,
+             stroke=1.5,
+             show.legend = FALSE)+
+  scale_fill_manual(values=c("tomato", "dodgerblue2"))+
+  theme(legend.position=c(0.1, 0.1),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) ->> plt.data3
+
+plt.data3
+```
+
+Now we can reverse the scale length to visualise an upper rejection region
+```{r}
+ggplot(data.frame(x = c(-4, 4)), aes(x = x)) +
+        stat_function(fun = dt, args = list(df = 96))+
+  geom_hline(yintercept = 0.0)+
+  geom_vline(xintercept = 0, linetype='dashed', colour='dodgerblue4', size=2)+
+  geom_vline(xintercept = 3.177308, colour='tomato3', linetype='dashed', size=2)+
+  geom_vline(xintercept = 1.660881, colour='dodgerblue4')+
+  geom_area(stat = "function",args=list(df =96), 
+            fun = dt, fill = "dodgerblue4", xlim = c(1.66, 4))+
+  geom_area(stat = "function",args=list(df =96), 
+            fun = dt, fill = "dodgerblue4", xlim = c(-1.66, -4))+
+  scale_x_continuous(limits = c(-7.5, 10.45))+
+  theme_void() +
+  theme(panel.background = element_rect(fill = "transparent", colour = NA), 
+        plot.background = element_rect(fill = "transparent", colour = NA))+
+  coord_flip() ->> t.distplt2
+
+t.distplt2
+```
+
+```{r}
+# correct plot
+#pdf("dotpltT5.pdf")
+plot_grid(plt.data3, t.distplt2, rel_widths = c(4,1))# Almost there
+#dev.off()
+```
+
+```{r}
+ggplot(df.long, aes(Condition, Response, colour=Condition, fill=Condition))+
+  geom_dotplot(stackdir = 'center', 
+               binaxis = "y", 
+               colour="grey22", 
+               binwidth = 1,
+               dotsize = .5)+
+  geom_hline(yintercept=mean(df.long$Response[df.long$Condition=="F"]),
+             colour='tomato3',
+             linetype='dashed',
+             size = 2)+
+  geom_hline(yintercept=mean(df.long$Response[df.long$Condition=="M"]),
+             colour = 'dodgerblue4',
+             linetype='dashed', 
+             size=2)+
+  geom_point(data = df.summary, aes(x=Condition, y=mean), 
+             shape=23, 
+             size=8,
+             fill="grey22",
+             alpha=.8,
+             stroke=1.5,
+             show.legend = FALSE)+
+  scale_fill_manual(values=c("tomato", "dodgerblue2"))+
+  theme_classic()+
+  theme(legend.position=c(0.1, 0.1),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) ->> plt.data4
+
+plt.data4
+
+```
+
+```{r}
+# correct plot
+#pdf("dotpltT6.pdf")
+plot_grid(plt.data4, t.distplt, rel_widths = c(4,1))# Almost there
+#dev.off()
+
+```
+
+
+##3 Visualising Psychometric Data
+Psychometric Data from Session 4
+We can also plot the data with a correlogram/heatplot with stacked bar chart to indicate loading qualitatively
+```{r}
+load <- read.csv("LoadingsB5.csv") # Load the csv file
+load # O9 highest loading is 0.39 I have suppressed <0.4
+```
+
+Recode the items to make plotting more uniform later on
+```{r}
+library(tidyverse)
+load$Item <- factor(load$Item)
+#str(load$Item)
+#levels(load$Item)
+
+load$Item <- recode_factor(load$Item, 
+                           O1 = "O01", O2 = "O02", O3 = "O03", O4 = "O04", O5 = "O05", 
+                           O6 = "O06", O7 = "O07", O8 = "O08", O9 = "O09", O10 = "O10", 
+                           C1 = "C01", C2 = "C02", C3 = "C03", C4 = "C04", C5 = "C05", 
+                           C6 = "C06", C7 = "C07", C8 = "C08", C9 = "C09", C10 = "C10",
+                           E1 = "E01", E2 = "E02", E3 = "E03", E4 = "E04", E5 = "E05", 
+                           E6 = "E06", E7 = "E07", E8 = "E08", E9 = "E09", E10 = "E10",
+                           A1 = "A01", A2 = "A02", A3 = "A03", A4 = "A04", A5 = "A05", 
+                           A6 = "A06", A7 = "A07", A8 = "A08", A9 = "A09", A10 = "A10",
+                           N1 = "N01", N2 = "N02", N3 = "N03", N4 = "N04", N5 = "N05", 
+                           N6 = "N06", N7 = "N07", N8 = "N08", N9 = "N09", A10 = "A10") 
+levels(load$Item)
+```
+
+```{r}
+# Change names for factors
+colnames(load)  <-  c("Item", "Extraversion", "Neuroticism", 
+                      "Agreeableness", "Conscientiousness",
+                      "Openness")
+load
+```
+
+
+```{r}
+# Now reshape the data set for ggplot2
+library(reshape2)
+
+loadings.m <- melt(load, id="Item", 
+                   measure=c("Extraversion", "Neuroticism", 
+                             "Agreeableness", "Openness",
+                             "Conscientiousness"), 
+                   variable.name="Factor", value.name="Loading")
+loadings.m
+```
+
+This is a bar chart which shows the intensity of each factors loadings
+Load the viridis library
+```{r}
+library(viridis)
+```
+#### Factor Loading Plot
+
+```{r}
+#For each test, plot the loading as length and fill color of a bar
+# note that the length will be the absolute value of the loading but the 
+# fill color will be the signed value, more on this below
+ggplot(loadings.m, aes(Item, abs(Loading), fill=Loading)) + 
+  facet_wrap(~ Factor, nrow=1) + #place the factors in separate facets
+  geom_bar(stat="identity", colour='black') + #make the bars
+  geom_hline(yintercept = 0.4, colour='blue')+
+  coord_flip() + 
+  ylab("Loading Strength") + #improve y-axis label
+  scale_fill_viridis()+
+  theme(panel.background = NULL, panel.border = element_blank(),
+        strip.background =element_rect(fill="white"),
+        strip.text.x = element_text(size = 8),
+        axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 6))+
+  guides(fill=FALSE)->> LoadPlot
+
+
+LoadPlot
+```
+
+With magma Colouring
+```{r}
+LoadPlot+  scale_fill_viridis(option="A")#magma
+```
+
+
+## Correlation matrix
+```{r}
+Ord <- c("O01","O02", "O03", "O04", "O05", "O06", "O07", "O08", "O09", "O10", 
+         "C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10",
+         "E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09", "E10", 
+         "A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10",
+         "N01", "N02", "N03", "N04", "N05", "N06", "N07", "N08", "N09", "N10")
+colnames(data_FA) <- Ord
+
+efa_cor <- round(cor(data_FA),2)
+corrs.m <- melt(efa_cor, id="Test", variable.name="Test2", value.name="Correlation")
+corrs.m
+#write.csv(corrs.m, "FullCormat.csv")
+#corrs.m$Test2 <- reorder(corrs.m, rep(Ord, each=50)) 
+summary(corrs.m)
+```
+
+```{r}
+corrs.m2  <- read.csv("FullCormat.csv")
+corrs.m2$x  <- NULL
+
+melted_cormat2  <- read.csv("Cormatplot.csv")
+melted_cormat2$X  <- NULL
+```
+
+Next create a correlation matrix of data
+
+```{r}
+library(grid)
+p1 <- ggplot(data = melted_cormat2, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "black")+
+  scale_fill_viridis( limit = c(-1,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, size = 8, hjust = 1),
+       axis.text.y = element_text(size = 8),
+       plot.margin = unit(c(3, 1, 0, 0), "mm"),
+       panel.background = NULL)+
+  coord_fixed()+
+  guides(fill = FALSE) #omit unnecessary gradient legend
+p1
+# Note I removed the correlation values as needed
+# reinsert the following line to produce correlation values
+#   geom_text(aes(label = round(value, 2)), size=2.)
+```
+
+```{r}
+p2_alt<- ggplot(data = corrs.m2, aes(Var2, Var1, fill = Correlation))+
+ geom_tile(color = "black")+
+  scale_fill_viridis( limit = c(-1,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 1, size = 8, hjust = 1),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_text(size = 8),
+       plot.margin = unit(c(3, 1, 0, 0), "mm"),
+       panel.background = NULL)+
+  coord_fixed()+
+  guides(fill = FALSE)
+
+p2_alt
+```
+
+```{r}
+ggplot(data = corrs.m2, aes(Var2, Var1, fill = Correlation))+
+ geom_tile(color = "black")+
+  scale_fill_viridis( limit = c(-1,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 1, size = 8, hjust = 1),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_text(size = 8),
+       plot.margin = unit(c(3, 1, 0, 0), "mm"),
+       panel.background = NULL)+
+  coord_fixed()+
+  scale_fill_viridis(option="D")#magma
+```
+
+```{r}
+
+p2_alt + scale_fill_viridis(option="A")#magma
+
+```
+
+```{r}
+ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "black")+
+  theme_minimal()+ 
+  scale_colour_gradient2(high = 'yellow', 
+                         mid = "white",
+                         low = 'purple', 
+                         midpoint = 0, space = "Lab")+
+ theme(axis.text.x = element_text(angle = 90, vjust = 1, 
+    size = 8, hjust = 1),
+    axis.text.y = element_text(size = 8))+
+ coord_fixed()
+
+```
+
+
+
+```{r}
+# Stacked Bar Chart for Factor loadings
+p2 <- ggplot(loadings.m, aes(Item, abs(Loading), fill=Factor)) + 
+  geom_bar(stat="identity", colour='black') + coord_flip() + 
+  ylab("Loading Strength") + theme_bw(base_size=10) + 
+  scale_fill_viridis(discrete = TRUE)+
+  theme_classic()+
+  #remove labels and tweak margins for combining with the correlation matrix plot
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_blank()) -> pload1
+
+
+pload1
+```
+
+```{r}
+pload2  <- pload1 + theme(legend.position = "none")
+pload2
+```
+
+Change to Magma Colouring
+```{r}
+loadMagma  <- pload2 +  scale_fill_viridis(discrete=TRUE, option="A")#magma
+```
+
+
+```{r}
+library(cowplot)
+p2_Leg <- get_legend(pload1)
+p2_Leg
+```
+
+
+Now panel `p1` (correlation plot) and `p2` (stacked bar-chart)
+```{r}
+library(gridExtra)
+grid.arrange(p1_alt, pload2, ncol=2, widths=c(2, 1))
+
+```
+
+```{r}
+# cowplot
+plot_grid(p2_alt, pload2, ncol=2, rel_widths = c(2, 1), align="h") ->> ldplt2
+
+```
+```{r}
+ldplt2
+```
+
+```{r}
+#pdf("LoadingPlotHeatmap2.pdf")
+ldplt2
+#dev.off()
+```
